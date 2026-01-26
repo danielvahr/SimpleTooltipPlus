@@ -1,6 +1,6 @@
 ## Interface: 120000
 ## Title: SimpleTooltipPlus
-## Version: 0.1
+## Version: 0.2.0
 ## Author: Daniel van Ahrens
 
 SimpleTooltipPlus.lua
