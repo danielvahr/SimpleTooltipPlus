@@ -49,6 +49,35 @@ local function GetUnitItemLevel(unit)
 end
 
 -- -----------------------------
+-- Determine current mount (best-effort via mount aura)
+-- -----------------------------
+local function GetUnitMountName(unit)
+    if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return nil end
+    if not C_MountJournal or not C_MountJournal.GetMountFromSpell or not C_MountJournal.GetMountInfoByID then return nil end
+
+    local foundName = nil
+
+    -- Scan helpful auras and map aura spellID -> mountID
+    AuraUtil.ForEachAura(unit, "HELPFUL", nil, function(auraData)
+        local spellId = auraData and auraData.spellId
+        if not spellId then return end
+
+        local mountID = C_MountJournal.GetMountFromSpell(spellId)
+        if mountID then
+            local name = C_MountJournal.GetMountInfoByID(mountID)
+            if name and name ~= "" then
+                foundName = name
+                return true -- stop iteration
+            end
+        end
+    end, true) -- usePackedAura=true so we actually receive auraData tables
+
+    return foundName
+end
+
+
+
+-- -----------------------------
 -- Tooltip hook (Unit)
 -- -----------------------------
 local function OnTooltipSetUnit(tooltip)
@@ -75,11 +104,23 @@ local function OnTooltipSetUnit(tooltip)
         end
     end
 
-    -- Target of target
+    
     -- Use stable unit tokens first (mouseover is reliable for tooltip units).
     local baseUnit = UnitExists("mouseover") and "mouseover" or unit
     local targetUnit = baseUnit .. "target"
-
+    
+    
+    -- Mount
+    if UnitIsPlayer(baseUnit) then
+        local mountName = GetUnitMountName(baseUnit)
+        if mountName then
+            -- Spacing
+            tooltip:AddLine(" ")
+            tooltip:AddLine("|cff66ccff" .. mountName .. "|r")
+        end
+    end
+    
+    -- Target of target
     if UnitExists(targetUnit) then
         local name = UnitName(targetUnit)
         if name then
