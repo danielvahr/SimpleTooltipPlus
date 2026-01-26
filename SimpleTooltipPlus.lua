@@ -56,6 +56,7 @@ local function GetUnitMountName(unit)
     if not C_MountJournal or not C_MountJournal.GetMountFromSpell or not C_MountJournal.GetMountInfoByID then return nil end
 
     local foundName = nil
+    local foundCollected = nil
 
     -- Scan helpful auras and map aura spellID -> mountID
     AuraUtil.ForEachAura(unit, "HELPFUL", nil, function(auraData)
@@ -64,18 +65,18 @@ local function GetUnitMountName(unit)
 
         local mountID = C_MountJournal.GetMountFromSpell(spellId)
         if mountID then
-            local name = C_MountJournal.GetMountInfoByID(mountID)
+            -- isCollected is the 11th return value
+            local name, _, _, _, _, _, _, _, _, _, isCollected = C_MountJournal.GetMountInfoByID(mountID)
             if name and name ~= "" then
                 foundName = name
+                foundCollected = isCollected and true or false
                 return true -- stop iteration
             end
         end
     end, true) -- usePackedAura=true so we actually receive auraData tables
 
-    return foundName
+    return foundName, foundCollected
 end
-
-
 
 -- -----------------------------
 -- Tooltip hook (Unit)
@@ -83,8 +84,6 @@ end
 local function OnTooltipSetUnit(tooltip)
     local _, unit = tooltip:GetUnit()
     if not unit then return end
-
-
 
     -- Item level
     if UnitIsPlayer(unit) then
@@ -104,19 +103,25 @@ local function OnTooltipSetUnit(tooltip)
         end
     end
 
-    
     -- Use stable unit tokens first (mouseover is reliable for tooltip units).
     local baseUnit = UnitExists("mouseover") and "mouseover" or unit
     local targetUnit = baseUnit .. "target"
     
-    
     -- Mount
     if UnitIsPlayer(baseUnit) then
-        local mountName = GetUnitMountName(baseUnit)
+        local mountName, isCollected = GetUnitMountName(baseUnit)
         if mountName then
             -- Spacing
             tooltip:AddLine(" ")
-            tooltip:AddLine("|cff66ccff" .. mountName .. "|r")
+
+            local collectedText
+            if isCollected then
+                collectedText = " |cff00ff00[Collected]|r"
+            else
+                collectedText = " |cffff4040[Not Collected]|r"
+            end
+
+            tooltip:AddLine("|cff66ccff" .. mountName .. "|r" .. collectedText)
         end
     end
     
