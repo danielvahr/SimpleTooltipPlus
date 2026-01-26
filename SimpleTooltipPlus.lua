@@ -56,7 +56,10 @@ local function OnTooltipSetUnit(tooltip)
     if not unit then return end
 
     -- Target of target
-    local targetUnit = unit .. "target"
+    -- Use stable unit tokens first (mouseover is reliable for tooltip units).
+    local baseUnit = UnitExists("mouseover") and "mouseover" or unit
+    local targetUnit = baseUnit .. "target"
+
     if UnitExists(targetUnit) then
         local name = UnitName(targetUnit)
         if name then
