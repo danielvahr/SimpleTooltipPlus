@@ -17,39 +17,34 @@ local function GetUnitItemLevel(unit)
     local guid = UnitGUID(unit)
     if not guid then return nil end
 
+    -- Cache
     if itemLevelCache[guid] then
         return itemLevelCache[guid]
     end
 
-    -- Own character
+    -- Own character: Use simple API
     if UnitIsUnit(unit, "player") then
         local _, equipped = GetAverageItemLevel()
-        local ilvl = math.floor(equipped or 0)
+        local ilvl = math.floor((equipped or 0) + 0.0001)
         itemLevelCache[guid] = ilvl
         return ilvl
     end
 
-    -- Other players: usually only works after Inspect
-    local total, count = 0, 0
-    for i = 1, 17 do
-        if i ~= 4 then -- Ignore shirt slot
-            local itemLink = GetInventoryItemLink(unit, i)
-            if itemLink then
-                local level = C_Item.GetDetailedItemLevelInfo(itemLink)
-                if level then
-                    total = total + level
-                    count = count + 1
-                end
-            end
+    if pendingInspect[guid] then
+        return nil;
+    end
+
+    -- Other players: Use Blizzard's inspect average item level (reliable)
+    if C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel then
+        local inspectedIlvl = C_PaperDollInfo.GetInspectItemLevel(unit)
+        if inspectedIlvl and inspectedIlvl > 0 then
+            local ilvl = math.floor(inspectedIlvl + 0.0001)
+            itemLevelCache[guid] = ilvl
+            return ilvl
         end
     end
 
-    if count > 0 then
-        local avg = math.floor(total / count)
-        itemLevelCache[guid] = avg
-        return avg
-    end
-
+    -- Inspect data not ready yet
     return nil
 end
 
@@ -60,7 +55,7 @@ local function OnTooltipSetUnit(tooltip)
     local _, unit = tooltip:GetUnit()
     if not unit then return end
 
-    -- 1) Target of target
+    -- Target of target
     local targetUnit = unit .. "target"
     if UnitExists(targetUnit) then
         local name = UnitName(targetUnit)
@@ -85,7 +80,7 @@ local function OnTooltipSetUnit(tooltip)
         end
     end
 
-    -- 2) Item level
+    -- Item level
     if UnitIsPlayer(unit) then
         local guid = UnitGUID(unit)
         local ilvl = GetUnitItemLevel(unit)
