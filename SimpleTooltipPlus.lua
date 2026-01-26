@@ -55,33 +55,7 @@ local function OnTooltipSetUnit(tooltip)
     local _, unit = tooltip:GetUnit()
     if not unit then return end
 
-    -- Target of target
-    -- Use stable unit tokens first (mouseover is reliable for tooltip units).
-    local baseUnit = UnitExists("mouseover") and "mouseover" or unit
-    local targetUnit = baseUnit .. "target"
 
-    if UnitExists(targetUnit) then
-        local name = UnitName(targetUnit)
-        if name then
-            local color
-            if UnitIsPlayer(targetUnit) then
-                local _, class = UnitClass(targetUnit)
-                color = RAID_CLASS_COLORS[class] or NORMAL_FONT_COLOR
-            else
-                color = { r = 0.5, g = 0.5, b = 0.5 }
-            end
-
-            tooltip:AddLine(
-                "Ziel: " ..
-                string.format("|cff%02x%02x%02x%s|r",
-                    (color.r or 1) * 255,
-                    (color.g or 1) * 255,
-                    (color.b or 1) * 255,
-                    name
-                )
-            )
-        end
-    end
 
     -- Item level
     if UnitIsPlayer(unit) then
@@ -98,6 +72,38 @@ local function OnTooltipSetUnit(tooltip)
                 pendingInspect[guid] = true
                 NotifyInspect(unit)
             end
+        end
+    end
+
+    -- Target of target
+    -- Use stable unit tokens first (mouseover is reliable for tooltip units).
+    local baseUnit = UnitExists("mouseover") and "mouseover" or unit
+    local targetUnit = baseUnit .. "target"
+
+    if UnitExists(targetUnit) then
+        local name = UnitName(targetUnit)
+        if name then
+            local color
+            if UnitIsPlayer(targetUnit) then
+                local _, class = UnitClass(targetUnit)
+                color = RAID_CLASS_COLORS[class] or NORMAL_FONT_COLOR
+            else
+                color = { r = 0.5, g = 0.5, b = 0.5 }
+            end
+
+            -- Spacing
+            tooltip:AddLine(" ")
+
+            tooltip:AddDoubleLine(
+                "Target:",
+                string.format("|cff%02x%02x%02x%s|r",
+                    (color.r or 1) * 255,
+                    (color.g or 1) * 255,
+                    (color.b or 1) * 255,
+                    name
+                ),
+                1, 1, 1
+            )
         end
     end
 end
