@@ -5,6 +5,8 @@
 -- WoW Retail 12.0.1+
 -- =========================================
 
+local _, STP = ...
+
 local pendingInspect = {}     -- guid -> true (NotifyInspect already sent)
 local itemLevelCache = {}     -- guid -> ilvl (optional cache)
 
@@ -73,7 +75,7 @@ local function GetUnitMountName(unit)
                 return true -- stop iteration
             end
         end
-    end, true) -- usePackedAura=true so we actually receive auraData tables
+    end, true) -- usePackedAura=true to receive auraData tables
 
     return foundName, foundCollected
 end
@@ -82,74 +84,82 @@ end
 -- Tooltip hook (Unit)
 -- -----------------------------
 local function OnTooltipSetUnit(tooltip)
-    local _, unit = tooltip:GetUnit()
+    local _, unit = STP.util.Scrub(tooltip:GetUnit())
+    if not unit then
+        unit = "mouseover"
+    end
+
     if not unit then return end
 
     -- Item level
-    if UnitIsPlayer(unit) then
-        local guid = UnitGUID(unit)
-        local ilvl = GetUnitItemLevel(unit)
-
-        if ilvl then
-            tooltip:AddLine("Item-Level: |cffffd100" .. ilvl .. "|r")
-        else
-            tooltip:AddLine("Item-Level: |cff808080Loading...|r")
-
-            -- Trigger Inspect only once per GUID
-            if guid and CanInspect(unit) and not pendingInspect[guid] then
-                pendingInspect[guid] = true
-                NotifyInspect(unit)
+    if STP.db.config.showItemLevel then
+        if UnitIsPlayer(unit) then
+            local guid = UnitGUID(unit)
+            local ilvl = GetUnitItemLevel(unit)
+    
+            if ilvl then
+                tooltip:AddLine("Item-Level: |cffffd100" .. ilvl .. "|r")
+            else
+                tooltip:AddLine("Item-Level: |cff808080Loading...|r")
+    
+                -- Trigger Inspect only once per GUID
+                if guid and CanInspect(unit) and not pendingInspect[guid] then
+                    pendingInspect[guid] = true
+                    NotifyInspect(unit)
+                end
             end
         end
     end
 
-    -- Use stable unit tokens first (mouseover is reliable for tooltip units).
-    local baseUnit = UnitExists("mouseover") and "mouseover" or unit
-    local targetUnit = baseUnit .. "target"
-    
     -- Mount
-    if UnitIsPlayer(baseUnit) then
-        local mountName, isCollected = GetUnitMountName(baseUnit)
-        if mountName then
-            -- Spacing
-            tooltip:AddLine(" ")
-
-            local collectedText
-            if isCollected then
-                collectedText = " |cff00ff00[Collected]|r"
-            else
-                collectedText = " |cffff4040[Not Collected]|r"
+    if STP.db.config.showMount then
+        if UnitIsPlayer(unit) then
+            local mountName, isCollected = GetUnitMountName(unit)
+            if mountName then
+                -- Spacing
+                tooltip:AddLine(" ")
+    
+                local collectedText
+                if isCollected then
+                    collectedText = " |cff00ff00[Collected]|r"
+                else
+                    collectedText = " |cffff4040[Not Collected]|r"
+                end
+    
+                tooltip:AddLine("|cff66ccff" .. mountName .. "|r" .. collectedText)
             end
-
-            tooltip:AddLine("|cff66ccff" .. mountName .. "|r" .. collectedText)
         end
     end
-    
+
     -- Target of target
-    if UnitExists(targetUnit) then
-        local name = UnitName(targetUnit)
-        if name then
-            local color
-            if UnitIsPlayer(targetUnit) then
-                local _, class = UnitClass(targetUnit)
-                color = RAID_CLASS_COLORS[class] or NORMAL_FONT_COLOR
-            else
-                color = { r = 0.5, g = 0.5, b = 0.5 }
+    if STP.db.config.showTarget then
+        local targetUnit = unit .. "target"
+        if UnitExists(targetUnit) then
+            local name = UnitName(targetUnit)
+            if name then
+                local color
+                local isPlayer = STP.util.Scrub(UnitIsPlayer(targetUnit))
+                if isPlayer then
+                    local _, class = STP.util.Scrub(UnitClass(targetUnit))
+                    color = RAID_CLASS_COLORS[class] or NORMAL_FONT_COLOR
+                else
+                    color = { r = 0.5, g = 0.5, b = 0.5 }
+                end
+        
+                -- Spacing
+                tooltip:AddLine(" ")
+        
+                tooltip:AddDoubleLine(
+                    "Target:",
+                    string.format("|cff%02x%02x%02x%s|r",
+                        (color.r or 1) * 255,
+                        (color.g or 1) * 255,
+                        (color.b or 1) * 255,
+                        name
+                    ),
+                    1, 1, 1
+                )
             end
-
-            -- Spacing
-            tooltip:AddLine(" ")
-
-            tooltip:AddDoubleLine(
-                "Target:",
-                string.format("|cff%02x%02x%02x%s|r",
-                    (color.r or 1) * 255,
-                    (color.g or 1) * 255,
-                    (color.b or 1) * 255,
-                    name
-                ),
-                1, 1, 1
-            )
         end
     end
 end
@@ -165,8 +175,7 @@ eventFrame:SetScript("OnEvent", function(_, event, guid)
     if event == "INSPECT_READY" then
         if guid then pendingInspect[guid] = nil end
 
-        -- Important: DO NOT use SetUnit() -> causes “sticky” tooltips
-        -- Only refresh if the tooltip is visible AND still refers to the same unit
+        -- Refresh if the tooltip is visible AND still refers to the same unit
         if not GameTooltip:IsVisible() then return end
 
         local _, tipUnit = GameTooltip:GetUnit()
@@ -198,7 +207,11 @@ eventFrame:SetScript("OnEvent", function(_, event, guid)
     end
 end)
 
+local function PostUnitTooltip(tooltip, tooltipData)
+    OnTooltipSetUnit(tooltip)
+end
+
 -- -----------------------------
 -- Register tooltip hook
 -- -----------------------------
-TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, OnTooltipSetUnit)
+TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, PostUnitTooltip)

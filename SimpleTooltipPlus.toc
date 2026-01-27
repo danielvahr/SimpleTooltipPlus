@@ -2,5 +2,8 @@
 ## Title: SimpleTooltipPlus
 ## Version: 1.0.0
 ## Author: Daniel van Ahrens
+## SavedVariables: SimpleTooltipPlus_Config
 
+core.lua
+util.lua
 SimpleTooltipPlus.lua
