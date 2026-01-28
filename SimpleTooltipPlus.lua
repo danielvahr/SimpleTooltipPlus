@@ -63,17 +63,21 @@ local function GetUnitMountName(unit)
     -- Scan helpful auras and map aura spellID -> mountID
     AuraUtil.ForEachAura(unit, "HELPFUL", nil, function(auraData)
         local spellId = auraData and auraData.spellId
-        if not spellId then return end
+        if type(spellId) ~= "number" then
+            return
+        end
 
-        local mountID = C_MountJournal.GetMountFromSpell(spellId)
-        if mountID then
-            -- isCollected is the 11th return value
-            local name, _, _, _, _, _, _, _, _, _, isCollected = C_MountJournal.GetMountInfoByID(mountID)
-            if name and name ~= "" then
-                foundName = name
-                foundCollected = isCollected and true or false
-                return true -- stop iteration
-            end
+        local mountID = STP.util.Scrub(C_MountJournal.GetMountFromSpell(spellId))
+        if not mountID or type(mountID) ~= "number" or mountID <= 0 then
+            return
+        end
+
+        -- isCollected is the 11th return value
+        local name, _, _, _, _, _, _, _, _, _, isCollected = STP.util.Scrub(C_MountJournal.GetMountInfoByID(mountID))
+        if name and name ~= "" and isCollected ~= nil then
+            foundName = name
+            foundCollected = isCollected and true or false
+            return true -- stop iteration
         end
     end, true) -- usePackedAura=true to receive auraData tables
 
