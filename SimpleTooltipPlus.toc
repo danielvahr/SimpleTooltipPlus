@@ -1,6 +1,6 @@
 ## Interface: 120000
 ## Title: SimpleTooltipPlus
-## Version: 1.0.2
+## Version: 1.0.3
 ## Author: Daniel van Ahrens
 ## SavedVariables: SimpleTooltipPlus_Config
 
