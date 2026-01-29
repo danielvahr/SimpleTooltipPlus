@@ -7,9 +7,41 @@
 
 local _, STP = ...
 
+-- time to live for inspect requests
 local INSPECT_TTL = 3 -- seconds
+
+-- time to live for cached item levels
+local ITEMLEVEL_TTL = 180 -- seconds
+
 local pendingInspect = {}     -- guid -> true (NotifyInspect already sent)
 local itemLevelCache = {}     -- guid -> ilvl (optional cache)
+
+-- util functions to get cached ilvl
+local function GetCachedIlvl(guid)
+    local entry = guid and itemLevelCache[guid]
+    if not entry then return nil end
+    if (GetTime() - (entry.timestamp or 0)) > ITEMLEVEL_TTL then
+        itemLevelCache[guid] = nil
+        return nil
+    end
+    return entry.ilvl
+end
+
+-- util function to set cached ilvl
+local function SetCachedIlvl(guid, ilvl)
+    if not guid or not ilvl then return end
+    itemLevelCache[guid] = { ilvl = ilvl, timestamp = GetTime() }
+end
+
+-- periodic cleanup of old cache entries
+C_Timer.NewTicker(60, function()
+    local now = GetTime()
+    for guid, entry in pairs(itemLevelCache) do
+        if not entry or (now - (entry.timestamp or 0)) > ITEMLEVEL_TTL then
+            itemLevelCache[guid] = nil
+        end
+    end
+end)
 
 -- -----------------------------
 -- Determine item level
@@ -21,15 +53,16 @@ local function GetUnitItemLevel(unit)
     if not guid then return nil end
 
     -- Cache
-    if itemLevelCache[guid] then
-        return itemLevelCache[guid]
+    local cached = GetCachedIlvl(guid)
+    if cached then
+        return cached
     end
 
     -- Own character: Use simple API
     if UnitIsUnit(unit, "player") then
         local _, equipped = GetAverageItemLevel()
         local ilvl = math.floor((equipped or 0) + 0.0001)
-        itemLevelCache[guid] = ilvl
+        SetCachedIlvl(guid, ilvl)
         return ilvl
     end
 
@@ -42,7 +75,7 @@ local function GetUnitItemLevel(unit)
         local inspectedIlvl = C_PaperDollInfo.GetInspectItemLevel(unit)
         if inspectedIlvl and inspectedIlvl > 0 then
             local ilvl = math.floor(inspectedIlvl + 0.0001)
-            itemLevelCache[guid] = ilvl
+            SetCachedIlvl(guid, ilvl)
             return ilvl
         end
     end
@@ -57,7 +90,7 @@ end
 local function GetUnitMountName(unit)
     if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return nil end
     if not C_MountJournal or not C_MountJournal.GetMountFromSpell or not C_MountJournal.GetMountInfoByID then return nil end
-
+    
     local foundName = nil
     local foundCollected = nil
 
@@ -178,6 +211,7 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("INSPECT_READY")
 eventFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
+eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 eventFrame:SetScript("OnEvent", function(_, event, guid)
     if event == "INSPECT_READY" then
@@ -195,7 +229,7 @@ eventFrame:SetScript("OnEvent", function(_, event, guid)
             -- Populate cache if possible
             local ilvl = GetUnitItemLevel("mouseover")
             if ilvl then
-                itemLevelCache[guid] = ilvl
+                SetCachedIlvl(guid, ilvl)
             end
 
             if GameTooltip.RefreshData then
@@ -208,7 +242,11 @@ eventFrame:SetScript("OnEvent", function(_, event, guid)
         if ClearInspectPlayer then
             ClearInspectPlayer()
         end
-
+    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+        local pguid = STP.util.Scrub(UnitGUID("player"))
+        if pguid then
+            itemLevelCache[pguid] = nil
+    end
     elseif event == "PLAYER_LEAVING_WORLD" then
         wipe(pendingInspect)
         wipe(itemLevelCache)
