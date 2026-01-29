@@ -182,7 +182,7 @@ eventFrame:SetScript("OnEvent", function(_, event, guid)
         -- Refresh if the tooltip is visible AND still refers to the same unit
         if not GameTooltip:IsVisible() then return end
 
-        local _, tipUnit = GameTooltip:GetUnit()
+        local _, tipUnit = STP.util.Scrub(GameTooltip:GetUnit())
         if not tipUnit then return end
         if UnitGUID(tipUnit) ~= guid then return end
 
