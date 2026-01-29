@@ -7,6 +7,7 @@
 
 local _, STP = ...
 
+local INSPECT_TTL = 3 -- seconds
 local pendingInspect = {}     -- guid -> true (NotifyInspect already sent)
 local itemLevelCache = {}     -- guid -> ilvl (optional cache)
 
@@ -107,9 +108,12 @@ local function OnTooltipSetUnit(tooltip)
                 tooltip:AddLine("Item-Level: |cff808080Loading...|r")
     
                 -- Trigger Inspect only once per GUID
-                if guid and CanInspect(unit) and not pendingInspect[guid] then
-                    pendingInspect[guid] = true
-                    NotifyInspect(unit)
+                if guid and CanInspect(unit) then
+                    local t = pendingInspect[guid]
+                    if not t or (GetTime() - t) > INSPECT_TTL then
+                        pendingInspect[guid] = GetTime()
+                        NotifyInspect(unit)
+                    end
                 end
             end
         end
