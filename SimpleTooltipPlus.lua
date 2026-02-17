@@ -138,15 +138,16 @@ local function OnTooltipSetUnit(tooltip)
             if ilvl then
                 tooltip:AddLine("Item-Level: |cffffd100" .. ilvl .. "|r")
             else
-                tooltip:AddLine("Item-Level: |cff808080Loading...|r")
-    
                 -- Trigger Inspect only once per GUID
-                if guid and CanInspect(unit) then
+                if guid and CanInspect(unit) and not UnitCanAttack("player", unit) then
                     local t = pendingInspect[guid]
                     if not t or (GetTime() - t) > INSPECT_TTL then
+                        tooltip:AddLine("Item-Level: |cff808080Loading...|r")
                         pendingInspect[guid] = GetTime()
                         NotifyInspect(unit)
                     end
+                elseif guid and UnitCanAttack("player", unit) then
+                    tooltip:AddLine("Item-Level: |cff808080N/A (Enemy)|r")
                 end
             end
         end
