@@ -141,8 +141,8 @@ local function OnTooltipSetUnit(tooltip)
                 -- Trigger Inspect only once per GUID
                 if guid and CanInspect(unit) and not UnitCanAttack("player", unit) then
                     local t = pendingInspect[guid]
+                    tooltip:AddLine("Item-Level: |cff808080Loading...|r")
                     if not t or (GetTime() - t) > INSPECT_TTL then
-                        tooltip:AddLine("Item-Level: |cff808080Loading...|r")
                         pendingInspect[guid] = GetTime()
                         NotifyInspect(unit)
                     end
